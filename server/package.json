@@ -1,0 +1,24 @@
+{
+  "name": "cram-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRAM Express and MySQL authentication API",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "migrate:dashboard": "node scripts/migrate-dashboard.js",
+    "migrate:workspace": "node scripts/migrate-workspace.js",
+    "test": "node scripts/check-api-client.js && node scripts/check-messenger-errors.js && node scripts/check-workspace.js",
+    "migrate:records": "node scripts/migrate-records.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.12.0"
+  }
+}
