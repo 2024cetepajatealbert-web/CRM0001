@@ -37,12 +37,10 @@
             ? "Repeat your password to confirm it."
             : `Enter your ${input.id.includes("email") ? "email address" : input.id.includes("password") ? "password" : input.id.includes("first") ? "first name" : "last name"}.`
           : "";
-      if (
-        input.id.includes("email") &&
-        (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || input.validity.typeMismatch)
-      ) {
-        return "Enter a valid email, like name@example.com.";
-      }
+      if (input.id.includes("email") && !/^[a-z0-9]+(?:[._%+-][a-z0-9]+)*@(gmail\.com|online\.htcgsc\.edu\.ph)$/i.test(value))
+        return "Use a valid @gmail.com or @online.htcgsc.edu.ph email address.";
+      if (input.id.startsWith("signup-") && input.id.endsWith("name") && !/^[\p{L}]+(?: [\p{L}]+)*$/u.test(value))
+        return "Use letters only for names (spaces between words are okay).";
       if (input.id.includes("password")) {
         if (value.length < 8) return `Use at least 8 characters — add ${8 - value.length} more.`;
         if (input.value.length > 128) return "Keep your password to 128 characters or fewer.";
