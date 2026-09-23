@@ -1,4 +1,5 @@
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailPattern = /^[a-z0-9]+(?:[._%+-][a-z0-9]+)*@(gmail\.com|online\.htcgsc\.edu\.ph)$/i;
+const namePattern = /^[\p{L}]+(?: [\p{L}]+)*$/u;
 
 function requireString(value, field, { min = 1, max = 255 } = {}) {
   if (typeof value !== "string" || value.trim().length < min || value.trim().length > max) {
@@ -19,4 +20,15 @@ function requireEmail(value) {
   return email;
 }
 
-module.exports = { requireString, requireEmail };
+function requireName(value, field, optional = false) {
+  if (optional && (value === undefined || value === "")) return "";
+  const name = requireString(value, field, { max: 80 });
+  if (!namePattern.test(name)) {
+    const error = new Error(`Invalid ${field}. Use letters only.`);
+    error.status = 400;
+    throw error;
+  }
+  return name;
+}
+
+module.exports = { requireString, requireEmail, requireName };
