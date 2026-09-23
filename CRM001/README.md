@@ -38,6 +38,8 @@ Sign-up saves the account directly to MySQL. Passwords are stored as bcrypt hash
 
 ## Start here
 
+For another computer, start with [Laptop Setup](../docs/LAPTOP_SETUP.md).
+
 From the project root, run `cd server`, then `npm run dev`. Open
 `http://localhost:4000` for the presentation. Keep the terminal and MySQL running.
 VS Code Live Server on `http://127.0.0.1:5500` or `http://localhost:5500` is also

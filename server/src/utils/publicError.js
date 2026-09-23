@@ -2,7 +2,7 @@
 class PublicError extends Error {
   constructor(message, status = 502) {
     super(message);
-    this.name = 'PublicError';
+    this.name = "PublicError";
     this.status = status;
   }
 }

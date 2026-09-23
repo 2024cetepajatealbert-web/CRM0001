@@ -20,4 +20,3 @@ function requireEmail(value) {
 }
 
 module.exports = { requireString, requireEmail };
-

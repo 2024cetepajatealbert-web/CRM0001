@@ -3,3 +3,7 @@ node_modules/
 server/.env
 *.log
 .tmp_dashboard/
+tmp/
+private-backups/
+# Original local export contains records and destructive DROP statements.
+server/sql/CRAMDB.sql

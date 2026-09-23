@@ -1,82 +1,48 @@
 # CRAM MySQL and authentication setup
 
-## 1. Understand the stack
+For step-by-step instructions on a different computer, follow [Laptop Setup](LAPTOP_SETUP.md).
 
-CRAM uses a JavaScript full-stack architecture:
+## Current stack
 
-| Layer | Technology | Responsibility |
-|---|---|---|
-| Client | Current HTML/CSS/JS prototype; React later | Displays Sign-up, Login, and CRM screens |
-| API | Express on Node.js | Validates requests, creates accounts, and issues sessions |
-| Database | MySQL | Stores users, teams, clients, and conversations |
+| Layer    | Technology               |
+| -------- | ------------------------ |
+| Client   | HTML, CSS and JavaScript |
+| Backend  | Express on Node.js       |
+| Database | MySQL 8.0/8.4            |
 
-MySQL replaces MongoDB here. Do **not** add Mongoose or MongoDB packages for this version.
+This version does not use React, MongoDB or Mongoose.
 
-## 2. Import the supplied database carefully
+## New installation
 
-`server/sql/CRAMDB.sql` is the supplied schema. It includes `DROP DATABASE IF EXISTS CRAMDB`, which deletes any existing CRAMDB database before recreating it. Use it only on a development database or when you are certain the existing data can be erased.
+From `server`, run `npm install` and `npm run setup:env`. Edit the private `.env`
+with this computer's MySQL settings. Quote DB_PASSWORD if it includes `#` or spaces.
+Start MySQL, then run `npm run setup:db` for an EMPTY database and `npm run dev`.
+Open <http://localhost:4000> and create an account.
 
-In MySQL Workbench, open `server/sql/CRAMDB.sql` and run it.
+The committed `server/sql/001_base.sql` contains only the seven empty core tables;
+`server/sql/002_dashboard.sql` adds dashboard storage. The setup command also runs
+workspace and record migrations. There are no default accounts or passwords.
 
-For the MySQL command line:
+## Existing database
 
-```powershell
-mysql -u root -p < server/sql/CRAMDB.sql
-```
+Back up first. Keep your current `.env`, DB_NAME and connection encryption key.
+Apply schema upgrades with `npm run migrate`; start normally with `npm run dev`.
+Do not initialize or import a database just to restart the website.
 
-## 3. Configure the Express server
+The old local `CRAMDB.sql` export is excluded from GitHub. It contains destructive
+DROP statements and records. Never rerun it against your working database.
 
-From the workspace root:
+## Connection and security
 
-```powershell
-if (-not (Test-Path server/.env)) { Copy-Item server/.env.example server/.env }
-cd server
-npm install
-```
+`server/src/config/database.js` manages a MySQL pool, prepared statements and
+transactions. Account passwords are bcrypt hashes, not recoverable plaintext.
+The API uses JWT sessions; `.env` must have a strong random JWT_SECRET.
+The setup:env command generates one for a new installation but never changes an
+existing file. A password or JWT signing-key change requires a fresh login.
 
-Edit `server/.env` with your local MySQL account. Never commit this file. The important database values are:
+The CONNECTION_ENCRYPTION_KEY protects saved Messenger credentials. Preserve it
+with your private backups; changing it makes existing encrypted connections unreadable.
+Never commit `.env`, personal data, database exports, tokens or App Secrets.
 
-```ini
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=CRAMDB
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-```
-
-If a password includes `#`, spaces, or other special characters, wrap it in double quotes in `.env`, for example: `DB_PASSWORD="your-password"`. Otherwise dotenv may treat part of the value as a comment.
-
-The reusable MySQL connection class is [database.js](../server/src/config/database.js). Controllers use `database.query()` for prepared statements and `database.transaction()` for operations that must succeed together, such as creating a team and a user.
-
-After editing `.env` (including a strong `JWT_SECRET`), run these commands from `server`:
-
-```powershell
-npm run migrate:dashboard
-npm run migrate:workspace
-npm run migrate:records
-npm run dev
-```
-
-See [Dashboard Guide](DASHBOARD_GUIDE.md) for the Facebook connection encryption key and Messenger setup. Do not overwrite an existing `.env` or reimport the base SQL into your working database.
-
-## 4. Connect the client to the API
-
-The server serves the current client from port 4000, so open `http://localhost:4000` after `npm run dev`.
-
-The client uses the API automatically when it is opened through the Express server. Sign-up calls:
-
-- `POST /api/auth/signup`
-
-Login calls:
-
-- `POST /api/auth/login`
-
-The account is saved to MySQL immediately after valid Sign-up details are submitted. There is no email-verification step.
-
-## 5. Security rules to keep
-
-- Keep passwords only as bcrypt hashes; CRAM already uses `bcryptjs` with 12 rounds.
-- Keep `.env`, JWT secrets, and database passwords out of Git.
-- Use HTTPS, a strong unique `JWT_SECRET`, and a production CORS origin before deployment.
-- Do not put a database password in the browser code.
-- Back up the database before applying schema changes to non-development data.
+The frontend uses the API when served by Express on port 4000 or by local VS Code
+Live Server on port 5500. The Express backend must run in both cases.
