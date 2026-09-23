@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const database = require("../config/database");
-const { requireEmail, requireString } = require("../utils/validation");
+const { requireEmail, requireName, requireString } = require("../utils/validation");
 
 const publicUser = (user) => ({
   id: user.user_id,
@@ -18,10 +18,9 @@ const issueToken = (user) =>
   );
 
 async function signup(request, response) {
-  const firstName = requireString(request.body.firstName, "first name", { max: 80 });
-  const middleName =
-    typeof request.body.middleName === "string" ? request.body.middleName.trim().slice(0, 80) : "";
-  const lastName = requireString(request.body.lastName, "last name", { max: 80 });
+  const firstName = requireName(request.body.firstName, "first name");
+  const middleName = requireName(request.body.middleName, "middle name", true);
+  const lastName = requireName(request.body.lastName, "last name");
   const email = requireEmail(request.body.email);
   const password = requireString(request.body.password, "password", { min: 8, max: 128 });
   const existing = await database.query("SELECT user_id FROM user WHERE email = ? LIMIT 1", [
