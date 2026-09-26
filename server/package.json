@@ -14,7 +14,7 @@
     "format:check": "prettier --check ../CRM001 ../docs src scripts package.json ../README.md ../.prettierrc.json",
     "migrate:dashboard": "node scripts/migrate-dashboard.js",
     "migrate:workspace": "node scripts/migrate-workspace.js",
-    "test": "node scripts/check-api-client.js && node scripts/check-messenger-errors.js && node scripts/check-workspace.js",
+    "test": "node scripts/check-validation.js && node scripts/check-api-client.js && node scripts/check-messenger-errors.js && node scripts/check-workspace.js",
     "test:fresh": "node scripts/check-fresh-install.js",
     "migrate:records": "node scripts/migrate-records.js"
   },

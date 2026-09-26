@@ -3,6 +3,7 @@ const db = require("../config/database");
 const authenticate = require("../middleware/authenticate");
 const access = require("../services/workspaceAccess");
 const asyncHandler = require("../utils/asyncHandler");
+const { requireName, requireContact } = require("../utils/validation");
 const router = express.Router();
 const stages = ["New lead", "Contacted", "Qualified", "Site visit", "Negotiation", "Won", "Lost"];
 const sources = [
@@ -96,10 +97,14 @@ async function saveClient(req, res) {
   const first = text(b.firstName, "first name", 30, true);
   const middle = text(b.middleName, "middle name", 30);
   const last = text(b.lastName, "last name", 30, true);
+  requireName(first, "first name");
+  requireName(middle, "middle name", true);
+  requireName(last, "last name");
   const name = `${first} ${last}`.slice(0, 60);
   const email = text(b.email, "email", 254).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("Enter a valid email.");
   const phone = text(b.phone, "phone number", 30);
+  if (phone) requireContact("Phone", phone);
   if (!email && !phone && !clientId) fail("Add an email address or phone number.");
   const source = choice(b.source ?? "Other", sources, "lead source");
   const stage = choice(b.stage ?? "New lead", stages, "stage");
@@ -193,6 +198,8 @@ router.post(
       due.getFullYear() > 2100
     )
       fail("Choose a valid due date and time.");
+    if (due.getTime() < Math.floor(Date.now() / 60000) * 60000)
+      fail("Choose now or a future time for a new activity.");
     let conversationId = null;
     if (b.conversationId) {
       conversationId = id(b.conversationId);

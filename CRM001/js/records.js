@@ -95,7 +95,8 @@
         names(profile) +
           field("Email", "email", profile.email, "email", 80) +
           field("Current password", "currentPassword", "", "password", 128) +
-          field("New password (leave blank to keep)", "newPassword", "", "password", 72, false),
+          field("New password (leave blank to keep)", "newPassword", "", "password", 128, false) +
+          field("Confirm new password", "confirmPassword", "", "password", 128, false),
         (values) => h.api("/profile", "PUT", values),
       );
     }

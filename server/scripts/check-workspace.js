@@ -42,12 +42,13 @@ async function req(path, { token, method = "GET", body, status = 200, headers = 
   return result;
 }
 async function signup(label, invitationToken) {
-  const email = `cram-workspace-qa-${stamp}-${label}@example.invalid`,
-    password = crypto.randomBytes(15).toString("hex");
+  // No email transport is used; these policy-compatible addresses are disposable DB fixtures only.
+  const email = `cram-workspace-qa-${stamp}-${label}@gmail.com`,
+    password = "Aa9!" + crypto.randomBytes(15).toString("hex");
   const r = await req("/api/auth/signup", {
     method: "POST",
     status: 201,
-    body: { firstName: "QA", lastName: label, email, password, invitationToken },
+    body: { firstName: "QA", middleName: "   ", lastName: label, email, password, invitationToken },
   });
   const a = { id: r.user.id, email, password, token: r.token };
   accounts.push(a);
@@ -61,6 +62,24 @@ async function check() {
   await req("/api/crm/collaboration", { token: "invalid", status: 401 });
   const owner = await signup("owner"),
     other = await signup("other");
+  for (const overrides of [
+    { email: "policy@example.invalid" },
+    { password: "a".repeat(73) },
+    { password: "é".repeat(37) },
+    { firstName: "Invalid123" },
+  ]) {
+    await req("/api/auth/signup", {
+      method: "POST",
+      status: 400,
+      body: {
+        firstName: "QA",
+        lastName: "Rejected",
+        email: `cram-qa-${stamp}@gmail.com`,
+        password: "Valid-password9!",
+        ...overrides,
+      },
+    });
+  }
   const team = await req("/api/crm/teams", {
     token: owner.token,
     method: "POST",
@@ -71,7 +90,7 @@ async function check() {
     token: owner.token,
     method: "POST",
     status: 201,
-    body: { email: `cram-workspace-qa-${stamp}-agent@example.invalid`, teamId: team.id },
+    body: { email: `cram-workspace-qa-${stamp}-agent@gmail.com`, teamId: team.id },
   });
   const agent = await signup("agent", invite.token);
   await req("/api/crm/teams", {
@@ -103,6 +122,21 @@ async function check() {
       type: "Site visit",
       dueAt: new Date(Date.now() + 86400000).toISOString(),
     },
+  });
+  await req(`/api/crm/clients/${client.id}/contacts`, {
+    token: owner.token,
+    method: "POST",
+    status: 201,
+    body: { type: "Email", value: "buyer@company.example" },
+  });
+  const contactSnapshot = await req("/api/crm/collaboration", { token: owner.token });
+  const companyEmail = contactSnapshot.contacts.find(
+    (contact) => contact.clientId === client.id && contact.value === "buyer@company.example",
+  );
+  assert.ok(companyEmail, "Customer emails outside signup domains are stored");
+  await req(`/api/crm/clients/${client.id}/contacts/${companyEmail.id}`, {
+    token: owner.token,
+    method: "DELETE",
   });
   await req(`/api/crm/clients/${client.id}/assignment`, {
     token: owner.token,
@@ -283,6 +317,7 @@ async function check() {
     assert.equal((await loginResponse).status(), 200, "Browser login should succeed");
     await page.locator("#login-welcome-step .open-dashboard").click();
     await page.locator(".workspace-header h1").waitFor();
+    await require("./check-dashboard-validation-ui")(page, { owner, client });
     for (const name of ["Clients", "Inbox", "Activities", "Teams", "Analytics", "Connect"]) {
       await page.locator(`.workspace-sidebar nav [data-page="${name}"]`).click();
       await page.locator("#workspace-content").waitFor();
@@ -318,7 +353,7 @@ async function check() {
     await page.getByRole("button", { name: "Invite agent", exact: true }).click();
     await page
       .locator("#team-dialog-form [name=email]")
-      .fill(`cram-workspace-qa-${stamp}-unused@example.invalid`);
+      .fill(`cram-workspace-qa-${stamp}-unused@gmail.com`);
     await page.locator("#team-dialog-form button").click();
     await page.locator("#invitation-result input").waitFor();
     await page.locator("#record-dialog [data-action=close-dialog]").click();

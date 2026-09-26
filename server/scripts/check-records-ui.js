@@ -61,7 +61,10 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
   await edited.locator("[data-record=delete-message]").click();
   await dialog.locator("[name=confirm]").fill("WRONG");
   await page.locator("#manage-record-form [type=submit]").click();
-  assert.match(await dialog.locator(".form-error").textContent(), /DELETE/);
+  assert.match(
+    await dialog.locator(".field-validation-error").filter({ hasText: "DELETE" }).textContent(),
+    /DELETE/,
+  );
   await confirmDelete();
   await page
     .locator(".chat-message")
@@ -122,7 +125,9 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByRole("button", { name: "My profile", exact: true }).click();
   const newPassword = dialog.locator("[name=newPassword]");
-  const eye = dialog.locator(".password-toggle").last();
+  const eye = dialog.locator(
+    `.password-toggle[aria-controls="${await newPassword.getAttribute("id")}"]`,
+  );
   await eye.click();
   assert.equal(await newPassword.getAttribute("type"), "text");
   await eye.click();

@@ -331,6 +331,16 @@
         : `<div class="form-grid"><label class="span-two">Client<select name="clientId" required>${data.clients.map((c) => `<option value="${c.id}" ${c.id === Number(clientId) ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label><label class="span-two">Task title *<input name="title" maxlength="160" required placeholder="e.g. Discuss financing options"></label><label>Type<select name="type">${options(appointment ? ["Site visit", "Online meeting"] : data.types, appointment ? "Site visit" : "Follow-up")}</select></label><label>Due date & time *<input name="dueAt" type="datetime-local" required></label><label class="span-two">Notes<textarea name="notes" maxlength="5000" rows="3" placeholder="Meeting location, agenda, or follow-up details"></textarea></label></div>`;
     lastFocus = document.activeElement;
     dialog().innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">People, before everything</p><h2 id="record-title">${title}</h2></div><button class="dialog-close" data-action="close-dialog" aria-label="Close dialog">×</button></div><p class="panel-description">${kind === "client" ? "Add at least an email address or phone number." : "Give every conversation a clear next step."}</p><form id="record-form">${kind === "task" && conversationId ? `<input type="hidden" name="conversationId" value="${Number(conversationId)}">` : ""}${fields}<p class="form-error" role="alert"></p><footer><button class="quiet-button" type="button" data-action="close-dialog">Cancel</button><button class="btn-primary" type="submit">${kind === "client" ? "Save client" : "Schedule task"} ${icon("arrow")}</button></footer></form>`;
+    const createdForm = dialog().querySelector("#record-form");
+    if (kind === "client" && !client) createdForm.dataset.requireContact = "true";
+    if (kind === "task") {
+      const dateField = createdForm.elements.dueAt;
+      const now = new Date();
+      dateField.dataset.future = "true";
+      dateField.min = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+    }
     if (kind === "client" && client)
       window.cramCollab?.contactEditor(dialog(), client, data, { api, load, toast, esc });
     if (!dialog().open) dialog().showModal();

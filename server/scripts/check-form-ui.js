@@ -24,8 +24,12 @@ module.exports = async (page, base) => {
   assert.equal(submitted, 0, "Invalid forms must not reach the API");
   await page.locator("#signup-first-name").fill("   ");
   assert.equal(await page.locator("#signup-first-name").getAttribute("aria-invalid"), "true");
-  await page.locator("#signup-first-name").fill("María-José");
-  await page.locator("#signup-last-name").fill("O’Connor");
+  await page.locator("#signup-first-name").fill("Anna123");
+  assert.equal(await page.locator("#signup-first-name").getAttribute("aria-invalid"), "true");
+  await page.locator("#signup-first-name").fill("María José");
+  await page.locator("#signup-last-name").fill("De la Cruz");
+  await page.locator("#signup-middle-name").fill("   ");
+  assert.equal(await page.locator("#signup-middle-name").getAttribute("aria-invalid"), "false");
   await page.locator("#signup-email").fill("not-an-email");
   assert.match(await page.locator("#signup-email-error").textContent(), /valid email/);
   await page.locator("#signup-password").fill("1234567");
@@ -36,22 +40,34 @@ module.exports = async (page, base) => {
       "rgb(182, 53, 53)",
   );
   await page.locator("#signup-password").fill("12345678");
+  assert.equal(await page.locator("#signup-password").getAttribute("aria-invalid"), "true");
+  await page.locator("#signup-password").fill("CramTest9!");
   assert.equal(await page.locator("#signup-password").getAttribute("aria-invalid"), "false");
+  assert.equal(await signup.locator(".password-checklist .is-met").count(), 6);
+  for (const password of ["a".repeat(73), "é".repeat(37)]) {
+    await page.locator("#signup-password").fill(password);
+    assert.match(await page.locator("#signup-password-error").textContent(), /72 password bytes/);
+  }
+  await page.locator("#signup-password").fill("CramTest9!");
   await page.locator("#signup-confirm-password").fill("87654321");
   assert.match(await page.locator("#signup-confirm-password-error").textContent(), /don’t match/);
-  await page.locator("#signup-confirm-password").fill("12345678");
+  await page.locator("#signup-confirm-password").fill("CramTest9!");
   assert.equal(
     await page.locator("#signup-confirm-password").getAttribute("aria-invalid"),
     "false",
   );
-  await page.locator("#signup-password").fill("123456789");
+  await page.locator("#signup-password").fill("CramTest99!");
   assert.equal(
     await page.locator("#signup-confirm-password").getAttribute("aria-invalid"),
     "true",
     "Recheck confirmation when the original changes",
   );
-  await page.locator("#signup-password").fill("12345678");
+  await page.locator("#signup-password").fill("CramTest9!");
   await page.locator("#signup-email").fill("existing@example.invalid");
+  assert.equal(await page.locator("#signup-email").getAttribute("aria-invalid"), "true");
+  await signup.locator("[type=submit]").click();
+  assert.equal(submitted, 0, "Disallowed signup domains must not reach the API");
+  await page.locator("#signup-email").fill("existing@gmail.com");
   await signup.locator("[type=submit]").click();
   await page.waitForFunction(() =>
     document.querySelector("#signup-email-error").textContent.includes("already has an account"),
@@ -108,7 +124,9 @@ module.exports = async (page, base) => {
       body: JSON.stringify({ message: "Invalid email or password." }),
     }),
   );
-  await page.locator("#login-email").fill("person@example.invalid");
+  await page.locator("#login-email").fill("person@gmol.com");
+  assert.equal(await page.locator("#login-email").getAttribute("aria-invalid"), "true");
+  await page.locator("#login-email").fill("person@gmail.com");
   await page.locator("#login-password").fill("wrong-password");
   await page.locator("#login-form [type=submit]").click();
   await page.waitForFunction(() =>

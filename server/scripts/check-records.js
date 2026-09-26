@@ -90,7 +90,7 @@ module.exports = async function checkRecords({
   await call(
     `/clients/${client.id}/contacts/${phone.id}`,
     "PUT",
-    { type: "Phone", value: "123" },
+    { type: "Phone", value: "09171234567" },
     other.token,
     404,
   );
@@ -318,7 +318,20 @@ module.exports = async function checkRecords({
     other.token,
     409,
   );
-  const password = require("crypto").randomBytes(16).toString("hex");
+  const password = "Aa9!" + require("crypto").randomBytes(16).toString("hex");
+  // Account email policy is enforced on login and profile edits, not customer contacts.
+  await req("/api/auth/login", {
+    method: "POST",
+    status: 400,
+    body: { email: "person@gmol.com", password },
+  });
+  await call(
+    "/profile",
+    "PUT",
+    { ...profile, email: "person@gmol.com", currentPassword: other.password },
+    other.token,
+    400,
+  );
   await call(
     "/profile",
     "PUT",
@@ -328,7 +341,7 @@ module.exports = async function checkRecords({
   await call("/workspace", "GET", undefined, other.token, 401);
   const login = await req("/api/auth/login", {
     method: "POST",
-    body: { email: other.email, password },
+    body: { email: profile.email, password },
   });
   assert.equal(login.user.firstName, "Changed");
   const [after] = await db.query(

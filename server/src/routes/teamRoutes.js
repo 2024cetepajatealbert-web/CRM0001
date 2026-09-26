@@ -4,7 +4,7 @@ const db = require("../config/database");
 const auth = require("../middleware/authenticate");
 const wrap = require("../utils/asyncHandler");
 const access = require("../services/workspaceAccess");
-const { requireString, requireEmail } = require("../utils/validation");
+const { requireString, requireContact, requireSignupEmail } = require("../utils/validation");
 router.use(auth);
 router.post(
   "/teams",
@@ -78,7 +78,7 @@ router.post(
   "/invitations",
   access.requireManager,
   wrap(async (req, res) => {
-    const email = requireEmail(req.body.email);
+    const email = requireSignupEmail(req.body.email);
     const teamId = Number(req.body.teamId) || req.user.workspace_id;
     const teams = await db.query("SELECT teams_id FROM teams WHERE teams_id=? AND workspace_id=?", [
       teamId,
@@ -148,10 +148,7 @@ router.post(
     const type = requireString(req.body.type, "contact type", { max: 20 });
     if (!["Messenger", "TikTok", "WhatsApp", "SMS", "Email", "Phone"].includes(type))
       access.fail("Unsupported contact type.");
-    const value =
-      type === "Email"
-        ? requireEmail(req.body.value)
-        : requireString(req.body.value, "contact value", { max: type === "Phone" ? 30 : 255 });
+    const value = requireContact(type, req.body.value);
     await db.transaction(async (conn) => {
       await conn.execute(
         "INSERT IGNORE INTO contact_point (client_id,contact_type,contact_info) VALUES (?,?,?)",

@@ -1,0 +1,56 @@
+/* Shared feedback keeps account and workspace forms visually consistent. */
+.password-checklist {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid #dbe8e1;
+  border-radius: 12px;
+  background: #f5f9f7;
+  color: #667975;
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.password-checklist li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.password-checklist li > span {
+  flex: 0 0 14px;
+  text-align: center;
+}
+.password-checklist .is-met {
+  color: #08766b;
+}
+.field-validation-error {
+  display: block;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px solid #efc9c2;
+  border-left: 3px solid #b63535;
+  border-radius: 7px;
+  background: #fff4f1;
+  color: #aa3030;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-validation-error[hidden] {
+  display: none;
+}
+#record-dialog [aria-invalid="true"],
+#crm [aria-invalid="true"] {
+  border-color: #b63535;
+  background: #fff8f6;
+  box-shadow: 0 0 0 2px rgb(182 53 53 / 9%);
+}
+#record-dialog .field-valid,
+#crm .field-valid {
+  border-color: #438b79;
+}
+#reply-form .field-validation-error {
+  grid-column: 1 / -1;
+}

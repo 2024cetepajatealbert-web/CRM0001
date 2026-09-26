@@ -3,7 +3,13 @@ const bcrypt = require("bcryptjs");
 const db = require("../config/database");
 const auth = require("../middleware/authenticate");
 const wrap = require("../utils/asyncHandler");
-const { requireString, requireEmail } = require("../utils/validation");
+const {
+  requireString,
+  requireSignupEmail,
+  requireNewPassword,
+  requireName,
+  requireContact,
+} = require("../utils/validation");
 const access = require("../services/workspaceAccess");
 const store = require("../services/recordStore");
 router.use(auth);
@@ -93,13 +99,7 @@ router.put(
     const type = req.body.type;
     if (!["Messenger", "TikTok", "WhatsApp", "SMS", "Email", "Phone"].includes(type))
       access.fail("Invalid contact type.");
-    let value = requireString(req.body.value, "contact value", {
-      max: type === "Phone" ? 30 : 254,
-    });
-    if (type === "Email") {
-      value = value.toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) access.fail("Invalid email address.");
-    }
+    const value = requireContact(type, req.body.value);
     await db.transaction(async (conn) => {
       const client = await store.client(conn, req.user, req.params.id);
       const [points] = await conn.execute(
@@ -196,16 +196,12 @@ router.get(
 router.put(
   "/profile",
   wrap(async (req, res) => {
-    const first = requireString(req.body.firstName, "first name", { max: 80 });
-    const middle = requireString(req.body.middleName || "", "middle name", { min: 0, max: 80 });
-    const last = requireString(req.body.lastName, "last name", { max: 80 });
-    const email = requireEmail(req.body.email);
+    const first = requireName(req.body.firstName, "first name");
+    const middle = requireName(req.body.middleName, "middle name", true);
+    const last = requireName(req.body.lastName, "last name");
+    const email = requireSignupEmail(req.body.email);
     const current = requireString(req.body.currentPassword, "current password", { max: 128 });
-    const next = req.body.newPassword
-      ? requireString(req.body.newPassword, "new password", { min: 8, max: 72 })
-      : null;
-    if (next && Buffer.byteLength(next) > 72)
-      access.fail("Password must be at most 72 UTF-8 bytes.");
+    const next = req.body.newPassword ? requireNewPassword(req.body.newPassword) : null;
     await db.transaction(async (conn) => {
       const [rows] = await conn.execute(
         "SELECT password_hash FROM user WHERE user_id=? FOR UPDATE",
@@ -233,9 +229,9 @@ router.put(
   owner,
   wrap(async (req, res) => {
     const id = store.id(req.params.id);
-    const first = requireString(req.body.firstName, "first name", { max: 80 });
-    const middle = requireString(req.body.middleName || "", "middle name", { min: 0, max: 80 });
-    const last = requireString(req.body.lastName, "last name", { max: 80 });
+    const first = requireName(req.body.firstName, "first name");
+    const middle = requireName(req.body.middleName, "middle name", true);
+    const last = requireName(req.body.lastName, "last name");
     if (!["AGENT", "MANAGER"].includes(req.body.role)) access.fail("Choose agent or manager.");
     await db.transaction(async (conn) => {
       const [members] = await conn.execute(
