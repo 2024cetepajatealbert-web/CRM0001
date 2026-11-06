@@ -4,7 +4,7 @@
   const states = new WeakMap();
   let nextId = 0;
   const selector =
-    "#record-form, #manage-record-form, #team-dialog-form, #contact-point-form, #reply-form, #facebook-connect, .member-add";
+    "#record-form, #manage-record-form, #team-dialog-form, #contact-point-form, #reply-form, #facebook-connect, #messenger-match, #recovery-form, .member-add";
   function checklist(input) {
     if (input.dataset.checklist) return;
     input.dataset.checklist = "true";
@@ -152,6 +152,11 @@
       return first;
     }
     const edit = (event) => {
+      if (
+        event.type === "focusout" &&
+        event.relatedTarget?.closest('button[type="submit"], button:not([type])')
+      )
+        return;
       if (fields.includes(event.target)) touched.add(event.target);
       const banner = form.querySelector(".form-error");
       if (banner) banner.textContent = "";

@@ -15,10 +15,44 @@
     staleDays = 14;
   let messages = [],
     hasMore = false,
+    hasRemoteHistory = false,
     canReply = false,
     polling = false,
     requestEpoch = 0;
   const drafts = new Map();
+  const pendingSends = new Map();
+  let lastFacebookSync = 0;
+  let sendingConversation = null;
+  function mediaHtml(items) {
+    if (typeof items === "string") {
+      try {
+        items = JSON.parse(items);
+      } catch {
+        return "";
+      }
+    }
+    if (!Array.isArray(items)) return "";
+    return items
+      .map((item) => {
+        let safe = false;
+        try {
+          const url = new URL(item.url);
+          safe =
+            url.protocol === "https:" &&
+            !url.username &&
+            !url.password &&
+            ["fbcdn.net", "fbsbx.com", "facebook.com"].some(
+              (host) => url.hostname === host || url.hostname.endsWith("." + host),
+            );
+        } catch {
+          /* Missing/unsupported media remains visible as a placeholder. */
+        }
+        if (!safe)
+          return "<small>Attachment unavailable here. Open it in your Facebook Page inbox.</small>";
+        return `<a class="chat-attachment" href="${e(item.url)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">${item.type === "image" ? `<img src="${e(item.url)}" alt="${e(item.name || "Messenger image")}" loading="lazy" referrerpolicy="no-referrer">` : ""}<span>Open ${e(item.type || "file")} ↗</span></a>`;
+      })
+      .join("");
+  }
   const e = (v) => h.esc(v);
   const c = () => data.collaboration;
   const tabs = (items, selected, action) =>
@@ -82,7 +116,7 @@
       messages
         .map(
           (m) =>
-            `<div class="chat-message ${m.sender === "Agent" ? "outbound" : "inbound"}"><p>${e(m.text)}</p><small>${h.date(m.createdAt)}${m.sender === "Agent" ? " · " + e(m.status) : ""}</small>${m.error ? `<small class="message-error">${e(m.error)}</small>` : ""}${window.cramRecords.messageActions(m, selectedConversation)}</div>`,
+            `<div class="chat-message ${m.sender === "Agent" ? "outbound" : "inbound"}"><p>${e(m.text)}</p>${mediaHtml(m.attachments)}<small>${h.date(m.createdAt)}${m.sender === "Agent" ? " · " + e(m.status) : ""}</small>${m.error ? `<small class="message-error">${e(m.error)}</small>` : ""}${window.cramRecords.messageActions(m, selectedConversation)}</div>`,
         )
         .join("") || '<p class="panel-description">No messages loaded.</p>'
     );
@@ -124,19 +158,40 @@
       const nearBottom =
         !scroll || scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 70;
       const oldHeight = scroll?.scrollHeight || 0;
+      const compare = (a, b) => new Date(a.createdAt) - new Date(b.createdAt) || a.id - b.id;
       const earlier = messages.filter(
-        (m) => result.messages.length && m.id < result.messages[0].id,
+        (m) => result.messages.length && compare(m, result.messages[0]) < 0,
       );
-      messages = older ? [...result.messages, ...messages] : [...earlier, ...result.messages];
+      messages = [
+        ...new Map(
+          (older ? [...messages, ...result.messages] : [...earlier, ...result.messages]).map(
+            (m) => [m.id, m],
+          ),
+        ).values(),
+      ].sort(compare);
       if (older || !earlier.length) hasMore = result.hasMore;
+      hasRemoteHistory = result.hasRemoteHistory;
       canReply = result.canReply;
       document.querySelector("#message-list").innerHTML = messageHtml();
-      document.querySelector("#older-messages").classList.toggle("hidden", !hasMore);
-      document.querySelector("#reply-form button").disabled = !canReply;
+      document
+        .querySelector("#older-messages")
+        .classList.toggle("hidden", !hasMore && !hasRemoteHistory);
+      document.querySelector("#older-messages").textContent = hasMore
+        ? "Load earlier messages"
+        : "Import earlier messages from Facebook";
+      document.querySelector("#reply-form button").disabled =
+        !canReply || sendingConversation === id;
+      const controls = document.querySelector(".thread-status .record-actions");
+      if (c().canManage && controls && !controls.querySelector('[data-collab="link-client"]'))
+        controls.insertAdjacentHTML(
+          "beforeend",
+          button("Match to existing client", "link-client", id),
+        );
       document.querySelector("#reply-guidance").textContent = canReply
         ? "Sent through your connected Facebook Page."
         : "Reply unavailable: connect the Page or wait for a new client message to open the standard reply window.";
-      document.querySelector("#chat-sync").textContent = "Up to date · checks every 5 seconds";
+      document.querySelector("#chat-sync").textContent =
+        "Local records refreshed · Facebook sync checks every 30 seconds when enabled";
       if (older) scroll.scrollTop = scroll.scrollHeight - oldHeight;
       else if (nearBottom || markRead) scroll.scrollTop = scroll.scrollHeight;
       if (markRead) await h.api(`/conversations/${id}/read`, "POST", {});
@@ -275,10 +330,10 @@
               c()
                 .connections.map(
                   (p) =>
-                    `<article class="connection-card"><strong>${e(p.pageName)}</strong><span>${e(p.status)}</span><small>Page ID ${e(p.pageId)}</small><p>Callback path</p><code>/api/messenger/webhook/${e(p.webhookKey)}</code><small>${p.lastEventAt ? "Last event " + h.date(p.lastEventAt) : "Waiting for signed Facebook events"}</small></article>`,
+                    `<article class="connection-card"><strong>${e(p.pageName)}</strong><span>${p.lastSyncAt ? "Facebook history synced" : e(p.status)}</span><small>Page ID ${e(p.pageId)}</small><small>${p.lastSyncAt ? "Last sync " + h.date(p.lastSyncAt) : "History has not been imported yet"}</small><small>${p.webhookVerifiedAt ? "Webhook verified · " + h.date(p.webhookVerifiedAt) : "Webhook optional for local sync"}</small>${p.syncError ? `<p class="form-error" role="alert">${e(p.syncError)}</p>` : ""}<div class="record-actions">${button("Sync chats now", "sync-page", p.id)}${button(p.syncEnabled ? "Pause automatic sync" : "Enable automatic sync", "sync-toggle", p.id)}${button("Show webhook settings", "webhook-details", p.id)}</div><small>Automatic sync: ${p.syncEnabled ? "on while a manager's Inbox is open" : "off"}</small><div id="webhook-details-${p.id}"></div></article>`,
                 )
                 .join("") || '<p class="panel-description">No Pages connected yet.</p>'
-            }<div class="connection-notice"><strong>Live setup</strong><p>A public HTTPS callback, Meta messaging permissions and a Page webhook subscription are required. Localhost cannot receive Facebook events directly.</p><p>Subscribe to messages for the selected Page. Existing message history is not imported by this connection.</p></div></div></div>`
+            }<div class="connection-notice"><strong>Two ways to receive conversations</strong><p><b>Local sync:</b> click Sync chats now, then enable automatic sync and open Inbox. CRAM uses your internet connection to fetch Facebook messages—no tunnel needed. Each sync imports up to 10 conversations and 50 recent messages per conversation. Repeat to continue through more conversations.</p><p><b>Webhooks:</b> for immediate delivery, configure a public HTTPS callback and subscribe your Page to messages and message echoes in Meta. Never use localhost as Meta's callback.</p><p>Reply in Inbox after the client messages your Page. Meta permissions and its standard reply window still apply. Update expired credentials using the form; your existing webhook settings are preserved.</p></div></div></div>`
           : h.empty(
               "A manager connects the Page",
               "Ask your workspace owner to configure Facebook here.",
@@ -362,7 +417,13 @@
                 `<label class="checkbox-label"><input type="checkbox" name="members" value="${m.id}">${e(m.name)}</label>`,
             )
             .join("")}</fieldset>`;
-    h.dialog().innerHTML = `<div class="dialog-heading"><h2 id="record-title">${kind === "invite" ? "Invite an agent" : "Create a subteam"}</h2><button class="dialog-close" data-action="close-dialog" aria-label="Close">×</button></div><form id="team-dialog-form" data-kind="${kind}">${fields}<p class="form-error" role="alert"></p><button class="btn-primary">${kind === "invite" ? "Create invitation link" : "Create subteam"}</button></form><div id="invitation-result"></div>`;
+    const delivery =
+      kind !== "invite"
+        ? ""
+        : c().emailDeliveryAvailable
+          ? '<label class="checkbox-label"><input type="checkbox" name="sendEmail">Also email this invitation to the agent</label>'
+          : '<p class="panel-description">Email delivery isn’t configured. You can copy and share the private invitation link.</p>';
+    h.dialog().innerHTML = `<div class="dialog-heading"><h2 id="record-title">${kind === "invite" ? "Invite an agent" : "Create a subteam"}</h2><button class="dialog-close" data-action="close-dialog" aria-label="Close">×</button></div><form id="team-dialog-form" data-kind="${kind}">${fields}${delivery}<p class="form-error" role="alert"></p><button class="btn-primary">${kind === "invite" ? "Create invitation link" : "Create subteam"}</button></form><div id="invitation-result"></div>`;
     h.dialog().showModal();
   }
   async function run(action) {
@@ -418,7 +479,56 @@
       messages = [];
       h.navigate("Inbox");
     }
-    if (action === "older") refreshMessages(true);
+    if (action === "older") {
+      target.disabled = true;
+      (async () => {
+        try {
+          if (!hasMore && hasRemoteHistory)
+            await h.api(`/conversations/${selectedConversation}/history`, "POST", {});
+          await refreshMessages(true);
+        } catch (error) {
+          h.toast(error.message);
+        } finally {
+          target.disabled = false;
+        }
+      })();
+    }
+    if (action === "sync-page") {
+      target.disabled = true;
+      run(async () => {
+        try {
+          const result = await h.api(`/connections/${id}/sync`, "POST", {});
+          h.toast(
+            result.busy
+              ? "This Page is already syncing."
+              : `${result.inserted} new messages saved.${result.hasMore ? " Sync again for more conversations." : " Open Inbox to reply."}`,
+          );
+        } finally {
+          target.disabled = false;
+        }
+      });
+    }
+    if (action === "sync-toggle")
+      run(() =>
+        h.api(`/connections/${id}/sync`, "PATCH", {
+          enabled: !c().connections.find((p) => p.id === id).syncEnabled,
+        }),
+      );
+    if (action === "webhook-details") {
+      (async () => {
+        try {
+          const result = await h.api(`/connections/${id}/webhook-details`, "POST", {});
+          document.querySelector(`#webhook-details-${id}`).innerHTML =
+            `<p class="panel-description">Keep the verify token private. It verifies setup; it is not a Page access token.</p><label>${result.callbackUrl ? "HTTPS callback URL" : "Callback path (add your public HTTPS domain)"}<input readonly value="${e(result.callbackUrl || result.callbackPath)}"></label><label>Verify token<input type="password" readonly value="${e(result.verifyToken)}"></label>`;
+        } catch (error) {
+          h.toast(error.message);
+        }
+      })();
+    }
+    if (action === "link-client") {
+      h.dialog().innerHTML = `<div class="dialog-heading"><h2 id="record-title">Match this conversation</h2><button class="dialog-close" data-action="close-dialog" aria-label="Close">×</button></div><p>Moves this conversation and its linked tasks to the selected client. Other client records are kept.</p><form id="messenger-match" data-id="${id}"><label>Client<select name="clientId" required>${data.clients.map((x) => `<option value="${x.id}" ${x.id === selectedClient ? "selected" : ""}>${e(x.name)}</option>`).join("")}</select></label><p class="form-error" role="alert"></p><button class="btn-primary">Link conversation</button></form>`;
+      h.dialog().showModal();
+    }
     if (action === "toggle-conversation")
       run(() =>
         h.api(`/conversations/${id}`, "PATCH", {
@@ -460,9 +570,13 @@
     const form = event.target;
     if (
       !h ||
-      (!["reply-form", "facebook-connect", "team-dialog-form", "contact-point-form"].includes(
-        form.id,
-      ) &&
+      (![
+        "reply-form",
+        "facebook-connect",
+        "team-dialog-form",
+        "contact-point-form",
+        "messenger-match",
+      ].includes(form.id) &&
         !form.classList.contains("member-add"))
     )
       return;
@@ -478,19 +592,44 @@
         const id = selectedConversation;
         const text = document.querySelector("#reply-text").value.trim();
         if (!text) return;
-        await h.api(`/conversations/${id}/messages`, "POST", {
-          text,
-          requestId: crypto.randomUUID(),
-        });
+        sendingConversation = id;
+        const previous = pendingSends.get(id);
+        const requestId = previous?.text === text ? previous.requestId : crypto.randomUUID();
+        pendingSends.set(id, { text, requestId });
+        try {
+          await h.api(`/conversations/${id}/messages`, "POST", { text, requestId });
+        } catch (sendError) {
+          // A known rejection can be retried; ambiguous delivery keeps the same ID.
+          try {
+            const latest = await h.api(`/conversations/${id}/messages`);
+            if (latest.messages.some((m) => m.requestId === requestId && m.status === "Failed"))
+              pendingSends.delete(id);
+            if (id === selectedConversation) await refreshMessages();
+          } catch {
+            /* Keep the ID while offline to avoid a duplicate send. */
+          }
+          throw sendError;
+        }
+        pendingSends.delete(id);
         drafts.delete(id);
-        document.querySelector("#reply-text").value = "";
+        if (id === selectedConversation && currentPage === "Inbox")
+          document.querySelector("#reply-text").value = "";
         await refreshMessages();
+      }
+      if (form.id === "messenger-match") {
+        await h.api(`/conversations/${form.dataset.id}/client`, "PUT", {
+          clientId: Number(values.clientId),
+        });
+        selectedClient = Number(values.clientId);
+        messages = [];
+        h.dialog().close();
+        await h.load();
       }
       if (form.id === "facebook-connect") {
         const result = await h.api("/connections/facebook", "POST", values);
         form.reset();
         document.querySelector("#connection-result").innerHTML =
-          `<div class="connection-notice"><strong>${e(result.pageName)} credentials saved</strong><p>Copy these into Meta’s webhook settings. The verify token is shown only now.</p><label>Callback path<input readonly value="${e(result.callbackPath)}"></label><label>Webhook verify token<input readonly value="${e(result.verifyToken)}"></label><p>${e(result.message)}</p></div>`;
+          `<div class="connection-notice"><strong>${e(result.pageName)} credentials saved</strong><p>Use Sync now to import conversations. For optional webhooks, copy these into Meta’s settings. Keep the token private; you can reveal it again from your Page card.</p><label>Callback path<input readonly value="${e(result.callbackPath)}"></label><label>Webhook verify token<input type="password" readonly value="${e(result.verifyToken)}"></label><p>${e(result.message)}</p></div>`;
       }
       if (form.id === "team-dialog-form") {
         if (form.dataset.kind === "team") {
@@ -499,6 +638,7 @@
           h.dialog().close();
           await h.load();
         } else {
+          values.sendEmail = form.elements.sendEmail?.checked === true;
           const result = await h.api("/invitations", "POST", values);
           const link =
             location.origin +
@@ -528,6 +668,7 @@
       if (error) error.textContent = err.message;
       else h.toast(err.message);
     } finally {
+      sendingConversation = null;
       if (submit) submit.disabled = false;
     }
   });
@@ -543,6 +684,16 @@
     try {
       if (currentPage === "Inbox") {
         const viewer = data.user.id;
+        if (Date.now() - lastFacebookSync >= 30000) {
+          lastFacebookSync = Date.now();
+          try {
+            if (c().canManage) await h.api("/messenger/sync", "POST", {});
+            else if (selectedConversation)
+              await h.api(`/conversations/${selectedConversation}/sync`, "POST", {});
+          } catch (error) {
+            h.toast(error.message);
+          }
+        }
         const [update, workspace] = await Promise.all([
           h.api("/collaboration"),
           h.api("/workspace"),
@@ -601,6 +752,8 @@
       selectedConversation = null;
       messages = [];
       drafts.clear();
+      pendingSends.clear();
+      lastFacebookSync = 0;
       requestEpoch++;
     },
     contactEditor(dialog, client, workspace, helpers) {

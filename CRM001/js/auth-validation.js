@@ -90,7 +90,10 @@
     }
     fields.forEach((input) => {
       input.addEventListener("input", () => edit(input));
-      input.addEventListener("blur", () => {
+      input.addEventListener("blur", (event) => {
+        // Let submit paint every field together, after the click completes.
+        // Growing an error label on pointer-down can move the button out from under the pointer.
+        if (event.relatedTarget?.closest('button[type="submit"], button:not([type])')) return;
         touched.add(input.id);
         paint(input);
       });

@@ -43,10 +43,13 @@ module.exports = async (page, base) => {
   assert.equal(await page.locator("#signup-password").getAttribute("aria-invalid"), "true");
   await page.locator("#signup-password").fill("CramTest9!");
   assert.equal(await page.locator("#signup-password").getAttribute("aria-invalid"), "false");
-  assert.equal(await signup.locator(".password-checklist .is-met").count(), 6);
+  assert.equal(await signup.locator(".password-checklist .is-met").count(), 5);
   for (const password of ["a".repeat(73), "é".repeat(37)]) {
     await page.locator("#signup-password").fill(password);
-    assert.match(await page.locator("#signup-password-error").textContent(), /72 password bytes/);
+    assert.match(
+      await page.locator("#signup-password-error").textContent(),
+      /password is too long/,
+    );
   }
   await page.locator("#signup-password").fill("CramTest9!");
   await page.locator("#signup-confirm-password").fill("87654321");

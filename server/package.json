@@ -9,7 +9,9 @@
     "start": "node src/server.js",
     "setup:env": "node scripts/setup-env.js",
     "setup:db": "node scripts/init-database.js && npm run migrate",
-    "migrate": "npm run migrate:dashboard && npm run migrate:workspace && npm run migrate:records",
+    "migrate": "node scripts/migrate-all.js",
+    "setup:security": "node scripts/secure-local.js",
+    "migrate:messenger": "node scripts/migrate-messenger.js",
     "format": "prettier --write ../CRM001 ../docs src scripts package.json ../README.md ../.prettierrc.json",
     "format:check": "prettier --check ../CRM001 ../docs src scripts package.json ../README.md ../.prettierrc.json",
     "migrate:dashboard": "node scripts/migrate-dashboard.js",
@@ -25,7 +27,8 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.12.0"
+    "mysql2": "^3.12.0",
+    "nodemailer": "10.2.1"
   },
   "devDependencies": {
     "prettier": "3.6.2"

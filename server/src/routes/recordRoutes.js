@@ -210,12 +210,12 @@ router.put(
       if (!rows.length || !(await bcrypt.compare(current, rows[0].password_hash)))
         access.fail("Current password is incorrect.", 400);
       await conn.execute(
-        "UPDATE user SET first_name=?,middle_name=?,last_name=?,email=? WHERE user_id=?",
-        [first, middle, last, email, req.user.user_id],
+        "UPDATE user SET first_name=?,middle_name=?,last_name=?,reset_token_hash=IF(email<>?,NULL,reset_token_hash),reset_expires_at=IF(email<>?,NULL,reset_expires_at),email=? WHERE user_id=?",
+        [first, middle, last, email, email, email, req.user.user_id],
       );
       if (next)
         await conn.execute(
-          "UPDATE user SET password_hash=?,auth_version=auth_version+1 WHERE user_id=?",
+          "UPDATE user SET password_hash=?,auth_version=auth_version+1,reset_token_hash=NULL,reset_expires_at=NULL WHERE user_id=?",
           [await bcrypt.hash(next, 12), req.user.user_id],
         );
       await access.activity(req.user, null, "Updated own account profile", conn);

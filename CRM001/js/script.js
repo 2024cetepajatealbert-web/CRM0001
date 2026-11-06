@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeOverlays();
   });
-  if (window.cramDashboard.hasSession()) openDashboard();
+  if (window.cramDashboard.hasSession() && !invitation.has("reset")) openDashboard();
   else if (invitation.has("invite")) {
     openSignup();
     document.querySelector("#signup-email").value = invitation.get("email") || "";

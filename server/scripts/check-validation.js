@@ -1,4 +1,10 @@
 const assert = require("node:assert/strict");
+const rules = require("../../CRM001/js/validation-rules");
+assert.equal(rules.passwordChecks("CramTest9!").length, 5);
+assert.ok(rules.passwordChecks("CramTest9!").every((rule) => rule.met));
+assert.ok(rules.passwordChecks("").every((rule) => !/UTF-8|bytes|No spaces/i.test(rule.label)));
+assert.match(rules.passwordError("Aa9!" + "a".repeat(69)), /password is too long/);
+assert.match(rules.passwordError("Has spaces9!"), /Remove spaces/);
 const {
   requireEmail,
   requireSignupEmail,

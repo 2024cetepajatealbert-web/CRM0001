@@ -388,7 +388,21 @@ async function check() {
       "PASS: browser navigation, client-to-Inbox, reply, calendar-to-Inbox, team creation, invitations, and responsive layouts; no JavaScript errors.",
     );
   }
+  await require("./check-messenger-sync")({
+    req,
+    owner,
+    other,
+    agent,
+    mockPage,
+    client,
+    browserPage: browser ? browser.contexts()[0].pages()[0] : null,
+  });
   await require("./check-records")({ req, owner, other, agent, client, task, team, conv });
+  await require("./check-recovery")({
+    req,
+    owner,
+    page: browser ? browser.contexts()[0].pages()[0] : null,
+  });
 }
 check()
   .catch((error) => {

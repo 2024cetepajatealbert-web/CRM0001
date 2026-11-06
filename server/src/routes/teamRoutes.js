@@ -4,6 +4,7 @@ const db = require("../config/database");
 const auth = require("../middleware/authenticate");
 const wrap = require("../utils/asyncHandler");
 const access = require("../services/workspaceAccess");
+const mail = require("../services/mailService");
 const { requireString, requireContact, requireSignupEmail } = require("../utils/validation");
 router.use(auth);
 router.post(
@@ -103,10 +104,26 @@ router.post(
       ],
     );
     await access.activity(req.user, null, `Created invitation for ${email}`);
+    let emailSent = false;
+    if (req.body.sendEmail === true && mail.configured()) {
+      try {
+        await mail.send({
+          to: email,
+          subject: "Join your CRAM team",
+          text: `You have been invited to a CRAM workspace. Use this private link within 7 days:\n${mail.link(new URLSearchParams({ invite: token, email }).toString())}\n\nIgnore this invitation if it was unexpected.`,
+        });
+        emailSent = true;
+      } catch {
+        console.error("Invitation email delivery failed; private link remains available.");
+      }
+    }
     res.status(201).json({
       token,
       email,
-      message: "Share this invitation privately. It expires in 7 days; no email has been sent.",
+      emailSent,
+      message: emailSent
+        ? "Invitation email sent. The link expires in 7 days."
+        : "Share this invitation privately. It expires in 7 days; no email has been sent.",
     });
   }),
 );

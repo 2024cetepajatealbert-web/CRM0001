@@ -82,7 +82,7 @@ module.exports = async (page, { owner, client }) => {
     await dialog.locator("[name=newPassword]").fill("CramNew9!");
     await dialog.locator("[name=confirmPassword]").fill("CramNew9!");
     assert.equal(await dialog.locator("[aria-invalid=true]").count(), 0);
-    assert.equal(await dialog.locator(".password-checklist .is-met").count(), 6);
+    assert.equal(await dialog.locator(".password-checklist .is-met").count(), 5);
     await page.setViewportSize({ width: 390, height: 844 });
     await dialog.locator("[name=newPassword]").scrollIntoViewIfNeeded();
     await page.screenshot({

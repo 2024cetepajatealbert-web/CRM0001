@@ -75,21 +75,45 @@ async function graph(path, token, body) {
   }
   return result;
 }
-async function receive(connection, event) {
+function attachments(items) {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, 20).map((item) => {
+    const type = item.type || (item.image_data ? "image" : item.video_data ? "video" : "file");
+    let url = item.payload?.url || item.image_data?.url || item.video_data?.url || item.file_url;
+    try {
+      const parsed = new URL(url);
+      const trusted = ["fbcdn.net", "fbsbx.com", "facebook.com"].some(
+        (host) => parsed.hostname === host || parsed.hostname.endsWith("." + host),
+      );
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password || !trusted)
+        url = null;
+    } catch {
+      url = null;
+    }
+    return {
+      type: ["image", "video", "audio", "file"].includes(type) ? type : "file",
+      name: String(item.name || "Attachment").slice(0, 255),
+      url: url || null,
+    };
+  });
+}
+async function receive(connection, event, options = {}) {
   const message = event.message;
-  if (!message?.mid) return;
+  if (typeof message?.mid !== "string" || !message.mid || message.mid.length > 255) return;
   const echo = Boolean(message.is_echo),
     psid = echo ? event.recipient?.id : event.sender?.id;
   if (!psid || !/^\d+$/.test(psid)) return;
+  const media = attachments(message.attachments);
   const content = String(
-    message.text || "[Attachment received — view it in your Facebook Page Inbox]",
+    message.text ||
+      (media.length ? "" : "[Message unavailable — view it in your Facebook Page Inbox]"),
   ).slice(0, 5000);
   const timestamp = Number(event.timestamp);
   const at =
     Number.isFinite(timestamp) && timestamp > 0
       ? new Date(Math.min(timestamp, Date.now()))
       : new Date();
-  await db.transaction(async (c) => {
+  return db.transaction(async (c) => {
     // Serializes contact creation and webhook retries for this Page.
     await c.execute("SELECT id FROM platform_connections WHERE id=? FOR UPDATE", [connection.id]);
     let [convs] = await c.execute(
@@ -101,7 +125,7 @@ async function receive(connection, event) {
       const [client] = await c.execute(
         `INSERT INTO client (client_first_name,client_middle_name,client_last_name,client_display_name,created_at,contact_point,user_user_id,workspace_id,created_by) VALUES ('Messenger','','Contact',?,NOW(),'Messenger',?,?,?)`,
         [
-          `Messenger contact ${psid.slice(-4)}`,
+          String(options.clientName || `Messenger contact ${psid.slice(-4)}`).slice(0, 60),
           connection.created_by,
           connection.workspace_id,
           connection.created_by,
@@ -120,8 +144,28 @@ async function receive(connection, event) {
       );
       conv = { conversation_id: created.insertId, client_client_id: client.insertId };
     }
+    if (options.externalId) {
+      await c.execute("UPDATE conversation SET conversation_id_ext=? WHERE conversation_id=?", [
+        options.externalId,
+        conv.conversation_id,
+      ]);
+      if (options.clientName)
+        await c.execute(
+          "UPDATE client SET client_display_name=? WHERE client_id=? AND client_display_name=?",
+          [
+            String(options.clientName).slice(0, 60),
+            conv.client_client_id,
+            `Messenger contact ${psid.slice(-4)}`,
+          ],
+        );
+    }
+    if (options.source !== "sync")
+      await c.execute(
+        "UPDATE platform_connections SET status='Connected',last_event_at=NOW() WHERE id=?",
+        [connection.id],
+      );
     const [insert] = await c.execute(
-      `INSERT IGNORE INTO message (sender_type,receiver_type,message_content,status,created_at,sent_at,conversation_conversation_id,provider_message_id) VALUES (?,?,?,'Sent',?,?,?,?)`,
+      `INSERT IGNORE INTO message (sender_type,receiver_type,message_content,status,created_at,sent_at,conversation_conversation_id,provider_message_id,attachments) VALUES (?,?,?,'Sent',?,?,?,?,?)`,
       [
         echo ? "Agent" : "Client",
         echo ? "Client" : "Agent",
@@ -130,22 +174,39 @@ async function receive(connection, event) {
         at,
         conv.conversation_id,
         message.mid,
+        media.length ? JSON.stringify(media) : null,
       ],
     );
-    if (!insert.affectedRows) return;
+    if (!insert.affectedRows) {
+      if (media.length)
+        await c.execute(
+          "UPDATE message SET attachments=? WHERE conversation_conversation_id=? AND provider_message_id=?",
+          [JSON.stringify(media), conv.conversation_id, message.mid],
+        );
+      return { id: conv.conversation_id, inserted: false };
+    }
     await c.execute(
-      `UPDATE conversation SET last_message_sender_type=IF(last_message_at IS NULL OR last_message_at<=?, ?,last_message_sender_type),last_message_at=GREATEST(COALESCE(last_message_at,?),?), last_incoming_at=IF(?,last_incoming_at,GREATEST(COALESCE(last_incoming_at,?),?)),unread_count=unread_count+?,status='Open' WHERE conversation_id=?`,
-      [at, echo ? "Agent" : "Client", at, at, echo, at, at, echo ? 0 : 1, conv.conversation_id],
+      `UPDATE conversation SET status=IF(? AND (last_message_at IS NULL OR last_message_at<?),'Open',status),last_message_sender_type=IF(last_message_at IS NULL OR last_message_at<=?, ?,last_message_sender_type),last_message_at=GREATEST(COALESCE(last_message_at,?),?), last_incoming_at=IF(?,last_incoming_at,GREATEST(COALESCE(last_incoming_at,?),?)),unread_count=unread_count+? WHERE conversation_id=?`,
+      [
+        !echo && options.notify !== false,
+        at,
+        at,
+        echo ? "Agent" : "Client",
+        at,
+        at,
+        echo,
+        at,
+        at,
+        echo || options.notify === false ? 0 : 1,
+        conv.conversation_id,
+      ],
     );
     if (echo)
       await c.execute("UPDATE client SET contacted_at=COALESCE(contacted_at,?) WHERE client_id=?", [
         at,
         conv.client_client_id,
       ]);
-    await c.execute(
-      "UPDATE platform_connections SET status='Connected',last_event_at=NOW() WHERE id=?",
-      [connection.id],
-    );
+    return { id: conv.conversation_id, inserted: true };
   });
 }
-module.exports = { encrypt, decrypt, graph, receive };
+module.exports = { encrypt, decrypt, graph, receive, attachments };

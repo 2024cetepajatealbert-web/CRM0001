@@ -18,8 +18,12 @@ then open <http://localhost:4000>. Do not initialize or reset your database just
 - Sign-up/login with password hashing, inline validation and password visibility controls.
 - Persistent client, contact, task and team management with confirmation for destructive actions.
 - Overview, calendar, team assignment, workspace permissions and analytics.
-- Messenger integration code is present, but public webhook delivery is not yet verified.
-  It is not needed for the offline CRUD presentation. TikTok messaging is not implemented.
+- Messenger conversation import, safe attachment previews, client matching and optional
+  automatic sync while Inbox is open. The owner confirmed two-way messaging and
+  saved conversation history, and the Page token validated again on 2026-11-06.
+  Public webhook delivery remains unverified. TikTok messaging is not implemented.
+- Optional email invitations and expiring password-recovery links when SMTP is configured.
+  Signup still does not require email verification.
 
 ## Code organization
 
@@ -42,3 +46,5 @@ The original destructive SQL export is intentionally excluded.
 
 See [database records](docs/DATABASE_RECORDS.md), [database connection](docs/MYSQL_CONNECTION_GUIDE.md)
 and [dashboard guide](docs/DASHBOARD_GUIDE.md) for details.
+See [Messenger setup](docs/MESSENGER_SETUP.md) and the
+[Messenger/security change report](docs/MESSENGER_UPGRADE.md) for this upgrade.

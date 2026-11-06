@@ -1,5 +1,9 @@
 # CRAM system review — September 26, 2026
 
+Update: the [October Messenger/security upgrade](MESSENGER_UPGRADE.md) records the
+subsequent desktop hardening, recovery and sync changes. The observations below
+describe the earlier review, not the current credential configuration.
+
 Follow-up: [Task 6 validation](TASK6_VALIDATION.md) documents the subsequently
 requested strict account-domain/name policy and stronger new-password rules.
 That policy supersedes the email-login behavior described in this historical review.

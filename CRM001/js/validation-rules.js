@@ -14,15 +14,11 @@
     { label: "One uppercase letter (A–Z)", met: /[A-Z]/.test(value) },
     { label: "One number (0–9)", met: /[0-9]/.test(value) },
     { label: "One special character (for example ! @ #)", met: /[\p{P}\p{S}]/u.test(value) },
-    {
-      label: "No spaces; at most 72 UTF-8 bytes",
-      met: !!value && !/\s/.test(value) && new TextEncoder().encode(value).length <= 72,
-    },
   ];
   function passwordError(value) {
     if (value.length < 8) return `Use at least 8 characters — add ${8 - value.length} more.`;
     if (new TextEncoder().encode(value).length > 72)
-      return "Use at most 72 password bytes; some characters use more than one.";
+      return "Your password is too long. Please use a shorter password.";
     if (/\s/.test(value)) return "Remove spaces from your new password.";
     if (passwordChecks(value).some((rule) => !rule.met))
       return "Include an uppercase letter, a lowercase letter, a number, and a special character.";

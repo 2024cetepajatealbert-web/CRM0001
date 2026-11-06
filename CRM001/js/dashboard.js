@@ -465,6 +465,7 @@
       filter = "";
     },
     hasSession: () => Boolean(token),
+    logout,
     open,
   };
 })();

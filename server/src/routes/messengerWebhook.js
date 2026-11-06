@@ -19,6 +19,9 @@ router.get(
     const actual = String(req.query["hub.verify_token"] || "");
     if (req.query["hub.mode"] !== "subscribe" || !equalSecret(actual, expected))
       return res.sendStatus(403);
+    await db.query("UPDATE platform_connections SET webhook_verified_at=NOW() WHERE id=?", [
+      connection.id,
+    ]);
     res.type("text/plain").send(String(req.query["hub.challenge"] || ""));
   }),
 );

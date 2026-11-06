@@ -1,4 +1,6 @@
 // Integration check against a uniquely named, disposable database only.
+const adminEnv = require("node:path").join(__dirname, "../.env.admin");
+if (require("node:fs").existsSync(adminEnv)) require("dotenv").config({ path: adminEnv });
 require("dotenv").config({ path: require("node:path").join(__dirname, "../.env") });
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
@@ -40,6 +42,7 @@ async function run() {
     execute("migrate-dashboard.js");
     execute("migrate-workspace.js");
     execute("migrate-records.js");
+    execute("migrate-messenger.js");
     const [tables] = await connection.execute(
       "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?",
       [name],
@@ -51,6 +54,7 @@ async function run() {
     execute("migrate-workspace.js");
     execute("migrate-records.js");
     execute("check-workspace.js");
+    execute("migrate-messenger.js");
     console.log(
       "PASS: clean database setup, all 13 tables, safe refusal on repeat setup, repeatable migrations and full CRM tests.",
     );

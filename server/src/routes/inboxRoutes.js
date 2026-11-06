@@ -6,6 +6,7 @@ const wrap = require("../utils/asyncHandler");
 const access = require("../services/workspaceAccess");
 const { requireString } = require("../utils/validation");
 const messenger = require("../services/messengerService");
+const records = require("../services/recordStore");
 router.use(auth);
 async function conversation(user, id) {
   if (!Number.isSafeInteger(Number(id)) || Number(id) < 1) access.fail("Invalid conversation ID.");
@@ -55,7 +56,7 @@ router.get(
       ),
       access.manager(u)
         ? db.query(
-            "SELECT id,platform,page_id AS pageId,page_name AS pageName,status,webhook_key AS webhookKey,last_event_at AS lastEventAt FROM platform_connections WHERE workspace_id=?",
+            "SELECT id,platform,page_id AS pageId,page_name AS pageName,status,webhook_key AS webhookKey,last_event_at AS lastEventAt,last_sync_at AS lastSyncAt,sync_error AS syncError,sync_enabled AS syncEnabled,webhook_verified_at AS webhookVerifiedAt FROM platform_connections WHERE workspace_id=?",
             [u.workspace_id],
           )
         : [],
@@ -85,6 +86,7 @@ router.get(
       performance,
       invitations,
       canManage: access.manager(u),
+      emailDeliveryAvailable: require("../services/mailService").configured(),
     });
   }),
 );
@@ -92,14 +94,27 @@ router.get(
   "/conversations/:id/messages",
   wrap(async (req, res) => {
     const conv = await conversation(req.user, req.params.id);
-    const before = Number(req.query.before) || Number.MAX_SAFE_INTEGER;
+    let before = null;
+    if (req.query.before) {
+      [before] = await db.query(
+        "SELECT message_id,created_at FROM message WHERE conversation_conversation_id=? AND message_id=?",
+        [conv.conversation_id, records.id(req.query.before)],
+      );
+      if (!before) access.fail("This message no longer exists. Refresh the conversation.", 409);
+    }
     const messages = await db.query(
-      "SELECT message_id AS id,sender_type AS sender,message_content AS text,sender_user_id AS senderId,status,created_at AS createdAt,error_message AS error FROM message WHERE conversation_conversation_id=? AND message_id<? ORDER BY message_id DESC LIMIT 100",
-      [conv.conversation_id, before],
+      `SELECT message_id AS id,sender_type AS sender,message_content AS text,sender_user_id AS senderId,status,created_at AS createdAt,error_message AS error,attachments,request_id AS requestId FROM message WHERE conversation_conversation_id=?${before ? " AND (created_at<? OR (created_at=? AND message_id<?))" : ""} ORDER BY created_at DESC,message_id DESC LIMIT 100`,
+      [
+        conv.conversation_id,
+        ...(before ? [before.created_at, before.created_at, before.message_id] : []),
+      ],
     );
     res.json({
       messages: messages.reverse(),
       hasMore: messages.length === 100,
+      hasRemoteHistory: Boolean(
+        conv.conversation_id_ext && (!conv.history_loaded || conv.history_cursor),
+      ),
       canReply:
         conv.platform === "Messenger" &&
         Boolean(conv.credentials) &&
@@ -141,7 +156,11 @@ router.post(
       "SELECT message_id,status FROM message WHERE conversation_conversation_id=? AND request_id=?",
       [conv.conversation_id, requestId],
     );
-    if (existing) return res.json({ id: existing.message_id, status: existing.status });
+    if (existing) {
+      if (existing.status !== "Sent")
+        access.fail("Delivery is not confirmed. Check the conversation before sending again.", 409);
+      return res.json({ id: existing.message_id, status: existing.status });
+    }
     if (conv.platform !== "Messenger" || !conv.credentials)
       access.fail("Connect this Facebook Page before replying.", 409);
     if (!conv.last_incoming_at || Date.now() - new Date(conv.last_incoming_at).getTime() > 86400000)
@@ -192,7 +211,7 @@ router.post(
       );
       access.fail("Delivery could not be confirmed. Check your Page inbox.", 502);
     }
-    await db.transaction(async (c) => {
+    const finalId = await db.transaction(async (c) => {
       // Serialize with webhook echoes before merging the provider's message ID.
       await c.execute("SELECT id FROM platform_connections WHERE id=? FOR UPDATE", [
         conv.connection_id,
@@ -216,7 +235,7 @@ router.post(
           [result.message_id, responseSeconds, saved.insertId],
         );
       await c.execute(
-        "UPDATE conversation SET last_message_at=NOW(),last_message_sender_type='Agent' WHERE conversation_id=?",
+        "UPDATE conversation SET last_message_sender_type=IF(last_message_at IS NULL OR last_message_at<=NOW(),'Agent',last_message_sender_type),last_message_at=GREATEST(COALESCE(last_message_at,NOW()),NOW()) WHERE conversation_id=?",
         [conv.conversation_id],
       );
       await c.execute(
@@ -224,8 +243,9 @@ router.post(
         [conv.client_client_id],
       );
       await access.activity(req.user, conv.client_client_id, "Replied on Messenger", c);
+      return echo[0]?.message_id || saved.insertId;
     });
-    res.status(201).json({ id: saved.insertId, status: "Sent" });
+    res.status(201).json({ id: finalId, status: "Sent" });
   }),
 );
 router.post(
@@ -237,17 +257,20 @@ router.post(
     const page = await messenger.graph("me?fields=id,name,category", pageToken);
     if (!page.id || !page.name || !page.category) access.fail("Use a Facebook Page access token.");
     const [exists] = await db.query(
-      "SELECT id,workspace_id FROM platform_connections WHERE page_id=?",
+      "SELECT id,workspace_id,credentials,webhook_key FROM platform_connections WHERE page_id=?",
       [page.id],
     );
     if (exists && exists.workspace_id !== req.user.workspace_id)
       access.fail("This Page is already connected to another workspace.", 409);
-    const verifyToken = crypto.randomBytes(24).toString("hex");
-    const webhookKey = crypto.randomBytes(24).toString("hex");
+    // Refreshing a Page token must not invalidate a working webhook subscription.
+    const verifyToken = exists?.credentials
+      ? messenger.decrypt(exists.credentials).verifyToken
+      : crypto.randomBytes(24).toString("hex");
+    const webhookKey = exists?.webhook_key || crypto.randomBytes(24).toString("hex");
     const credentials = messenger.encrypt({ pageToken, appSecret, verifyToken });
     if (exists)
       await db.query(
-        "UPDATE platform_connections SET page_name=?,credentials=?,webhook_key=?,status='Awaiting webhook' WHERE id=? AND workspace_id=?",
+        "UPDATE platform_connections SET page_name=?,credentials=?,webhook_key=?,sync_error=NULL,status=IF(last_event_at IS NULL,'Awaiting webhook','Connected') WHERE id=? AND workspace_id=?",
         [page.name, credentials, webhookKey, exists.id, req.user.workspace_id],
       );
     else
@@ -266,7 +289,7 @@ router.post(
       verifyToken,
       callbackPath: `/api/messenger/webhook/${webhookKey}`,
       message:
-        "Page credentials saved. Configure the HTTPS callback and subscribe your Page in Meta.",
+        "Page credentials saved. Sync conversations now, or configure a public HTTPS webhook for immediate delivery.",
     });
   }),
 );

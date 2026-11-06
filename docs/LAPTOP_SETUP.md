@@ -32,7 +32,7 @@ Open `server/.env` in VS Code. Set these values to match your laptop:
 PORT=4000
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_NAME=cram_presentation
+DB_NAME=CRAMDB
 DB_USER=root
 DB_PASSWORD="YOUR_LAPTOP_MYSQL_PASSWORD"
 ```
@@ -40,7 +40,7 @@ DB_PASSWORD="YOUR_LAPTOP_MYSQL_PASSWORD"
 Replace the password placeholder; quote passwords containing `#` or spaces.
 Keep the generated JWT_SECRET and CONNECTION_ENCRYPTION_KEY private and unchanged.
 Do not copy credentials from screenshots or publish your `.env`.
-Using a separate `cram_presentation` database keeps other projects separate.
+Keep your existing CRAM database name. Do not rename or overwrite another project's schema.
 
 Start the MySQL Windows service (Windows Services app; the service name varies by installation).
 The MySQL user must be allowed to create a database and tables for the initial setup.
@@ -53,7 +53,7 @@ In the terminal inside `server`:
 npm run setup:db
 ```
 
-This creates the seven empty core tables, then applies the three migrations to
+This creates the seven empty core tables, then applies the four migrations to
 prepare all current features. It contains no DROP DATABASE and imports no account
 or client records. It refuses to initialize a database that already contains tables.
 
@@ -63,6 +63,18 @@ If initial setup is interrupted, do not delete tables automatically: keep the er
 and inspect the partial setup, or choose a NEW empty DB_NAME and retry.
 
 ## 4. Run and create your presentation account
+
+For a new installation, after setup succeeds, `npm run setup:security -- --database-user`
+can back up the database and create a restricted local runtime account. This requires
+an administrative MySQL account and `mysqldump` (set `MYSQLDUMP_PATH` if it is not
+in the default MySQL 8.0 Windows folder). Review errors before continuing.
+
+On the configured desktop this has already been done. `server/.env` is the restricted
+runtime configuration; `server/.env.admin` is private administrative configuration
+for migrations and backups. Neither belongs on GitHub. Use `npm run migrate` for
+schema updates: it selects the admin file when present. Do not run the web server
+with the admin configuration. Keep DB_NAME/DB_HOST/DB_PORT aligned in both private
+files if you deliberately change the database connection later.
 
 ```powershell
 npm run dev
@@ -115,8 +127,21 @@ git status
 git pull --ff-only origin main
 cd server
 npm install
+npm update body-parser qs
+npm run migrate
 npm run dev
 ```
+
+The November security update needs `body-parser` 1.20.9 or later in the 1.x line
+and `qs` 6.16.1 or later in the 6.x line. The checked pnpm lockfile contains
+1.20.9 and 6.16.2. `npm update body-parser qs` refreshes these even if your laptop
+has an older locally generated npm lockfile. Run `npm audit --omit=dev` afterward.
+If using pnpm instead of npm, install from the checked lockfile with
+`pnpm install --frozen-lockfile` and use `pnpm audit --prod`.
+
+Before `npm run migrate`, make a private database backup. This upgrade adds
+columns without resetting records. Use the private admin configuration if the
+runtime MySQL user has already been restricted.
 
 If you edited files locally and Git refuses, stop and review the changes. Never
 use reset --hard or force-push just to make the error disappear. If an update
@@ -130,7 +155,8 @@ before restarting. Pulling code does not synchronize the two computers' database
 - **Access denied:** check the laptop's MySQL user/password in `.env`.
 - **Unknown database / missing table:** check DB_NAME and complete the appropriate setup/migration.
 - **Old UI:** press Ctrl+F5. Sign out/in if needed. Do not reinitialize MySQL.
-- **Forgot password:** password hashes cannot be read back as passwords. Do not copy a hash into Login.
+- **Forgot password:** use the Login recovery link if SMTP is configured. Otherwise ask
+  your administrator; password hashes cannot be read back as passwords. Never paste a hash into Login.
 
 ## Formatting and tests
 
@@ -146,3 +172,10 @@ Formatting uses two-space indentation, multiline blocks and consistent spacing.
 Some HTML templates or SQL query strings may still contain long text; they are strings,
 not compressed application logic. Tests create and clean their own temporary QA
 workspaces; Meta calls are mocked and no real Facebook messages are sent.
+
+`npm run test:fresh` instead creates its own disposable database and needs the
+administrative configuration. It also checks repeatable migrations and password
+recovery with mocked email. Existing CRAM records are not used as test fixtures.
+
+See [Messenger setup](MESSENGER_SETUP.md) for online conversation sync and the
+optional email configuration. Facebook cannot sync while offline.
