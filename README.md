@@ -19,33 +19,35 @@ CRAM stores your team's clients, conversations and follow-ups in MySQL. One Node
 
 ## Set up a new computer
 
-### 1. Install the tools
+Follow these steps on the Windows computer where you want to run CRAM.
 
-- Install **Node.js 24.x** with npm. [Download Node.js](https://nodejs.org/en/download)
-- Install **MySQL Community Server 8.0 or 8.4**, configure it as a Windows service, and save the MySQL password you choose. MySQL Workbench is optional for viewing tables. [Download MySQL Community Server](https://dev.mysql.com/downloads/mysql/)
-- Install **Git** if you plan to clone the project. You can also download and extract the project ZIP. [Download Git](https://git-scm.com/downloads/)
+### 1. Install what you need
 
-### 2. Get the project and install its dependencies
+- **Node.js 24.x** includes npm, which installs CRAM’s dependencies. [Download Node.js](https://nodejs.org/en/download)
+- **MySQL Community Server 8.0 or 8.4** stores your CRAM data. During installation, set it up as a Windows service and save the MySQL password you choose. [Download MySQL Community Server](https://dev.mysql.com/downloads/mysql/)
+- **Git** lets you clone the project. If you already have the project ZIP, extract it and continue with those files. [Download Git](https://git-scm.com/downloads/)
 
-From a PowerShell terminal in the folder where you keep projects, run the following commands.
+### 2. Download CRAM and install its dependencies
+
+Open a PowerShell terminal in the folder where you keep your projects. Clone CRAM and enter its server folder.
 
 ```powershell
 git clone https://github.com/2024cetepajatealbert-web/CRM0001.git
 cd .\CRM0001\server
 ```
 
-If you already have the files, open the `server` folder that contains `package.json`. Run the remaining commands there.
+If you extracted the ZIP, open its `server` folder in the terminal. Run the remaining commands from that folder.
 
 ```powershell
 npm install
 npm run setup:env
 ```
 
-If you use pnpm for dependencies, use `pnpm install --frozen-lockfile` for the install step to match the versions in the repository.
+If you use pnpm, use `pnpm install --frozen-lockfile` for the install step.
 
-### 3. Connect CRAM to MySQL
+### 3. Enter this computer’s MySQL settings
 
-Open the generated `.env` file inside `server` in your editor. On a new local installation, set these entries using the MySQL credentials for **this computer**. The account used for initial setup needs permission to create the database and tables.
+Open **Services** in Windows and check that MySQL is running. Then open `server/.env` in VS Code. Use the MySQL login for **this computer** and replace the password placeholder. The account needs permission to create a database and tables during setup.
 
 ```dotenv
 DB_HOST=127.0.0.1
@@ -55,16 +57,50 @@ DB_USER=root
 DB_PASSWORD="your MySQL password here"
 ```
 
-The quotes allow passwords containing spaces or `#`. Keep the generated `JWT_SECRET` and `CONNECTION_ENCRYPTION_KEY` private and keep a secure copy. CRAM uses the second key to read saved Messenger credentials.
+Use your actual MySQL port and username if they differ from the example. Keep the quotes around passwords with spaces or `#`. Store your `.env` and its generated keys privately.
 
-### 4. Prepare the database and open CRAM
+### 4. Choose how to set up your data
 
-- **New or empty database.** Run `npm run setup:db` once. It creates the tables and applies the migrations. A fresh database starts with zero accounts.
-- **Restored database or an older CRAM installation.** Back it up, confirm `DB_NAME`, then run `npm run migrate`. Migrations use the private `.env.admin` file when present. An existing installation that already has the current schema can go straight to startup.
+#### Start fresh
 
-On a new install using local MySQL root, you can give CRAM its own restricted database login with `npm run setup:security -- --database-user`. This command uses `mysqldump` to make a private backup first. Set `MYSQLDUMP_PATH` to the executable's full path if it is installed outside the default MySQL 8.0 folder.
+Run this once from `server`. It creates an empty CRAM database with the tables the app needs.
 
-Run `npm run dev` and open CRAM. On an empty database, choose **Sign-up** and use a Gmail or `@online.htcgsc.edu.ph` address. Accounts and client records belong to the MySQL database on the computer hosting CRAM. [Open CRAM](http://localhost:4000)
+```powershell
+npm run setup:db
+```
+
+#### Bring your existing accounts and records
+
+Use this option if you have a full CRAM SQL backup. Import it into an empty database because the backup already contains the table definitions.
+
+1. Copy your private `.sql` backup to the new computer. Install MySQL Workbench if needed. [Download MySQL Workbench](https://dev.mysql.com/downloads/workbench/)
+2. Open MySQL Workbench, connect to MySQL on the new computer, and choose **Server → Data Import**.
+3. Select **Import from Self-Contained File** and browse to your backup.
+4. Under **Default Target Schema**, choose an empty `CRAMDB`. Use **New** to create it if needed. If `CRAMDB` already has records, use a separate empty schema and set `DB_NAME` to that schema in `server/.env`.
+5. Click **Start Import**. Once Workbench reports success, check that `DB_NAME` matches the database where you imported the backup. [MySQL Workbench import guide](https://dev.mysql.com/doc/workbench/en/wb-admin-export-import-management.html)
+6. Run the following from the `server` folder to bring the database schema up to date.
+
+   ```powershell
+   npm run migrate
+   ```
+
+If you already have an older CRAM database, back it up and run `npm run migrate` on that database. When `server/.env.admin` exists, migrations use its database settings. Check that it matches the database in `server/.env`.
+
+To use a Messenger Page connection restored from the backup, copy the original `CONNECTION_ENCRYPTION_KEY` privately from the old computer’s `server/.env` to the new one. CRAM uses that key to read the saved Page credentials.
+
+### 5. Start CRAM and sign in
+
+From `server`, run the following command and leave the terminal open.
+
+```powershell
+npm run dev
+```
+
+Open CRAM in your browser. If you started fresh, choose **Sign-up** and use a Gmail or `@online.htcgsc.edu.ph` address. If you restored a backup, log in with the CRAM account from that backup. [Open CRAM](http://localhost:4000)
+
+### Optional restricted database login
+
+After setup, you can give CRAM its own restricted MySQL login with `npm run setup:security -- --database-user`. Run it with your local MySQL root account configured in `server/.env`. It makes a private backup first using `mysqldump`. Set `MYSQLDUMP_PATH` to the executable’s full path if it is outside the default MySQL 8.0 folder.
 
 ## Optional connections
 
