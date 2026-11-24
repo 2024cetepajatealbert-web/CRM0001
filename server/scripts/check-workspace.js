@@ -307,7 +307,7 @@ async function check() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await require("./check-form-ui")(page, base);
+    await require("../tests/check-form-ui")(page, base);
     await page.goto(base);
     await page.locator(".header-auth .open-login").click();
     await page.locator("#login-email").fill(owner.email);
@@ -317,7 +317,7 @@ async function check() {
     assert.equal((await loginResponse).status(), 200, "Browser login should succeed");
     await page.locator("#login-welcome-step .open-dashboard").click();
     await page.locator(".workspace-header h1").waitFor();
-    await require("./check-dashboard-validation-ui")(page, { owner, client });
+    await require("../tests/check-dashboard-validation-ui")(page, { owner, client });
     for (const name of ["Clients", "Inbox", "Activities", "Teams", "Analytics", "Connect"]) {
       await page.locator(`.workspace-sidebar nav [data-page="${name}"]`).click();
       await page.locator("#workspace-content").waitFor();
@@ -339,7 +339,7 @@ async function check() {
       .getByText("We can show you the property tomorrow.", { exact: true })
       .waitFor();
     await page.screenshot({
-      path: require("path").join(__dirname, "../../.tmp_dashboard/inbox-desktop.png"),
+      path: require("path").join(__dirname, "../../tmp/screenshots/inbox-desktop.png"),
       fullPage: true,
     });
     await page.locator('.workspace-sidebar nav [data-page="Activities"]').click();
@@ -379,16 +379,21 @@ async function check() {
       .getByText("We can show you the property tomorrow.", { exact: true })
       .waitFor();
     await page.screenshot({
-      path: require("path").join(__dirname, "../../.tmp_dashboard/inbox-mobile.png"),
+      path: require("path").join(__dirname, "../../tmp/screenshots/inbox-mobile.png"),
       fullPage: true,
     });
-    await require("./check-records-ui")({ page, owner, task, client, conv, team });
+    await require("../tests/check-records-ui")({ page, owner, task, client, conv, team });
     assert.deepEqual(errors, []);
     console.log(
       "PASS: browser navigation, client-to-Inbox, reply, calendar-to-Inbox, team creation, invitations, and responsive layouts; no JavaScript errors.",
     );
   }
-  await require("./check-messenger-sync")({
+  await require("../tests/check-ai-demo")({
+    req,
+    owner,
+    page: browser ? browser.contexts()[0].pages()[0] : null,
+  });
+  await require("../tests/check-messenger-sync")({
     req,
     owner,
     other,
@@ -397,8 +402,8 @@ async function check() {
     client,
     browserPage: browser ? browser.contexts()[0].pages()[0] : null,
   });
-  await require("./check-records")({ req, owner, other, agent, client, task, team, conv });
-  await require("./check-recovery")({
+  await require("../tests/check-records")({ req, owner, other, agent, client, task, team, conv });
+  await require("../tests/check-recovery")({
     req,
     owner,
     page: browser ? browser.contexts()[0].pages()[0] : null,

@@ -91,7 +91,7 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
     "X vertically centered",
   );
   await page.screenshot({
-    path: require("path").join(__dirname, "../../.tmp_dashboard/add-client-simple-desktop.png"),
+    path: require("path").join(__dirname, "../../tmp/screenshots/add-client-simple-desktop.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -101,7 +101,7 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
     "Mobile form fits",
   );
   await page.screenshot({
-    path: require("path").join(__dirname, "../../.tmp_dashboard/add-client-simple-mobile.png"),
+    path: require("path").join(__dirname, "../../tmp/screenshots/add-client-simple-mobile.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -115,7 +115,7 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
   await row.getByRole("button", { name: "Edit", exact: true }).click();
   await dialog.locator("[data-record=delete-client]").click();
   await page.screenshot({
-    path: require("path").join(__dirname, "../../.tmp_dashboard/delete-confirmation.png"),
+    path: require("path").join(__dirname, "../../tmp/screenshots/delete-confirmation.png"),
     fullPage: true,
   });
   await confirmDelete();
@@ -133,7 +133,7 @@ module.exports = async ({ page, owner, task, client, conv, team }) => {
   await eye.click();
   assert.equal(await newPassword.getAttribute("type"), "password");
   await page.screenshot({
-    path: require("path").join(__dirname, "../../.tmp_dashboard/profile-mobile.png"),
+    path: require("path").join(__dirname, "../../tmp/screenshots/profile-mobile.png"),
     fullPage: true,
   });
   await dialog.locator("[data-action=close-dialog]").first().click();

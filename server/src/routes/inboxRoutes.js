@@ -7,7 +7,28 @@ const access = require("../services/workspaceAccess");
 const { requireString } = require("../utils/validation");
 const messenger = require("../services/messengerService");
 const records = require("../services/recordStore");
+const demoInsights = require("../services/demoInsights");
+const rateLimit = require("express-rate-limit");
 router.use(auth);
+router.get("/ai-demo", (req, res) => {
+  res.json({ samples: demoInsights.samples, configured: demoInsights.configured() });
+});
+router.post(
+  "/ai-demo/:id/summary",
+  rateLimit({
+    windowMs: 60000,
+    limit: 12,
+    keyGenerator: (req) => String(req.user.user_id),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Please wait a minute before requesting another demo summary." },
+  }),
+  wrap(async (req, res) => {
+    if (Object.keys(req.body || {}).length || Object.keys(req.query).length)
+      access.fail("A demo summary accepts only a sample from the list.");
+    res.json(await demoInsights.summarize(req.params.id));
+  }),
+);
 async function conversation(user, id) {
   if (!Number.isSafeInteger(Number(id)) || Number(id) < 1) access.fail("Invalid conversation ID.");
   const s = access.scope(user);

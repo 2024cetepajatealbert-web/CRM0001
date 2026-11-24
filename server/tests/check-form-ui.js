@@ -82,14 +82,14 @@ module.exports = async (page, base) => {
   await page.locator("#signup-confirm-password").fill("different");
   await page.locator("#signup-email").focus();
   await page.screenshot({
-    path: path.join(__dirname, "../../.tmp_dashboard/signup-validation-desktop.png"),
+    path: path.join(__dirname, "../../tmp/screenshots/signup-validation-desktop.png"),
     fullPage: true,
   });
   const viewport = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#signup-confirm-password").scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: path.join(__dirname, "../../.tmp_dashboard/signup-validation-mobile.png"),
+    path: path.join(__dirname, "../../tmp/screenshots/signup-validation-mobile.png"),
     fullPage: true,
   });
   assert.equal(
@@ -115,7 +115,7 @@ module.exports = async (page, base) => {
   await page.locator("#signup-password").fill("");
   await page.locator("#signup-confirm-password").fill("");
   await page.screenshot({
-    path: path.join(__dirname, "../../.tmp_dashboard/signup-eyes-desktop.png"),
+    path: path.join(__dirname, "../../tmp/screenshots/signup-eyes-desktop.png"),
     fullPage: true,
   });
   await page.locator(".close-onboarding").click();
@@ -137,7 +137,7 @@ module.exports = async (page, base) => {
   );
   assert.equal(await page.locator("#login-form [aria-invalid=true]").count(), 2);
   await page.screenshot({
-    path: path.join(__dirname, "../../.tmp_dashboard/login-validation-desktop.png"),
+    path: path.join(__dirname, "../../tmp/screenshots/login-validation-desktop.png"),
     fullPage: true,
   });
   await page.locator("#login-password").fill("changed-password");

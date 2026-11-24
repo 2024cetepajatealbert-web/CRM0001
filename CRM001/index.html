@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/auth.css" />
     <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="css/collaboration.css" />
+    <link rel="stylesheet" href="css/ai-demo.css" />
     <link rel="stylesheet" href="css/form-controls.css" />
     <link rel="stylesheet" href="css/validation.css" />
   </head>
@@ -291,12 +292,58 @@
 
     <section class="crm hidden" id="crm" aria-label="CRAM client relationship workspace"></section>
     <dialog id="record-dialog" aria-labelledby="record-title"></dialog>
+    <dialog
+      id="ai-demo-dialog"
+      aria-labelledby="ai-demo-title"
+      aria-describedby="ai-demo-description"
+    >
+      <header class="ai-demo-header">
+        <img class="ai-demo-portrait" src="assets/mr-c.webp" alt="" width="54" height="54" />
+        <div>
+          <h2 id="ai-demo-title">Mr.C</h2>
+          <p id="ai-demo-description">Your Inbox assistant</p>
+        </div>
+        <form method="dialog">
+          <button type="submit" class="ai-demo-close" aria-label="Close Mr.C">
+            <span aria-hidden="true">×</span>
+          </button>
+        </form>
+      </header>
+      <div class="ai-demo-body">
+        <div id="ai-demo-samples" hidden>
+          <label for="ai-demo-select">Sample conversation</label>
+          <select id="ai-demo-select"></select>
+        </div>
+        <p id="ai-demo-status" role="status"></p>
+        <div id="ai-demo-result" hidden>
+          <div class="ai-demo-response">
+            <p id="ai-demo-source"></p>
+            <p id="ai-demo-summary"></p>
+          </div>
+          <section id="ai-demo-facts">
+            <h3>What the buyer needs</h3>
+            <ul></ul>
+          </section>
+          <section class="ai-demo-next">
+            <h3>My suggested follow-up</h3>
+            <p id="ai-demo-action"></p>
+            <p id="ai-demo-timing" hidden></p>
+          </section>
+        </div>
+        <button type="button" id="ai-demo-retry" class="quiet-button" hidden>Try again</button>
+        <details id="ai-demo-transcript" hidden>
+          <summary>Read sample chat</summary>
+          <ol></ol>
+        </details>
+      </div>
+    </dialog>
     <div class="toast" id="toast" role="status"></div>
     <script src="js/validation-rules.js"></script>
     <script src="js/form-validation.js"></script>
     <script src="js/api.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/collaboration.js"></script>
+    <script src="js/ai-demo.js"></script>
     <script src="js/records.js"></script>
     <script src="js/form-controls.js"></script>
     <script src="js/auth-validation.js"></script>

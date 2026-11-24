@@ -143,7 +143,8 @@
           "Select an incoming conversation to read and reply.",
         );
     if (conv) queueMicrotask(() => refreshMessages(false, true));
-    return `<section class="inbox-layout"><aside class="inbox-threads"><header><h2>Inbox</h2><small>Facebook Messenger conversations</small></header><div id="thread-list">${threadList()}</div></aside><div class="chat-pane">${main}</div></section>`;
+    return `<section class="inbox-layout"><aside class="inbox-threads"><header><h2>Inbox</h2><small>Facebook Messenger conversations</small></header><div id="thread-list">${threadList()}</div></aside><div class="chat-pane">${main}</div></section>
+      <button type="button" class="ai-demo-launcher" data-collab="ai-demo" aria-label="Open Mr.C" aria-haspopup="dialog" aria-controls="ai-demo-dialog"><img src="assets/mr-c.webp" alt="" width="36" height="36">Mr.C</button>`;
   }
   async function refreshMessages(older = false, markRead = false) {
     const id = selectedConversation,
@@ -441,6 +442,7 @@
     const action = target.dataset.collab,
       value = target.dataset.value,
       id = Number(target.dataset.id);
+    if (action === "ai-demo") return window.cramAiDemo.open(h.api);
     if (action === "client-tab") {
       clientTab = value;
       h.render();

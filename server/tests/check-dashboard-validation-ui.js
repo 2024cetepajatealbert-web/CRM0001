@@ -29,7 +29,7 @@ module.exports = async (page, { owner, client }) => {
     assert.equal(await dialog.locator("[aria-invalid=true]").count(), 0);
     await dialog.locator("[name=phone]").fill("letters");
     await page.screenshot({
-      path: path.join(__dirname, "../../.tmp_dashboard/client-validation.png"),
+      path: path.join(__dirname, "../../tmp/screenshots/client-validation.png"),
       fullPage: true,
     });
     await close();
@@ -86,7 +86,7 @@ module.exports = async (page, { owner, client }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await dialog.locator("[name=newPassword]").scrollIntoViewIfNeeded();
     await page.screenshot({
-      path: path.join(__dirname, "../../.tmp_dashboard/password-checklist-mobile.png"),
+      path: path.join(__dirname, "../../tmp/screenshots/password-checklist-mobile.png"),
       fullPage: true,
     });
     assert.equal(
